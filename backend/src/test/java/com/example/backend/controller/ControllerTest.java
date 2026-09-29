@@ -24,8 +24,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +46,42 @@ class ControllerTest {
     @MockitoBean private SkillOfferService skillOfferService;
     @MockitoBean private SessionRequestService sessionRequestService;
     @MockitoBean private CreditLedgerService creditLedgerService;
+
+    @Test
+    void rootUrlShowsBackendIsRunning() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("SkillSwap Backend is Running!"));
+    }
+
+    @Test
+    void corsAllowsLiveServerOrigin() throws Exception {
+        mockMvc.perform(options("/api/sessions/1/confirm")
+                        .header("Origin", "http://127.0.0.1:5500")
+                        .header("Access-Control-Request-Method", "PUT")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5500"));
+    }
+
+    @Test
+    void corsAllowsPageOpenedFromFile() throws Exception {
+        // A page opened by double-click (file:///) sends "Origin: null".
+        mockMvc.perform(options("/api/members/register")
+                        .header("Origin", "null")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "null"));
+    }
+
+    @Test
+    void corsRejectsUnknownWebsite() throws Exception {
+        mockMvc.perform(options("/api/members")
+                        .header("Origin", "https://evil.example.com")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void registerReturns201AndNeverExposesPassword() throws Exception {
